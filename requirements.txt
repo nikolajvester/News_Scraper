@@ -1,0 +1,13 @@
+playwright
+beautifulsoup4
+lxml
+requests
+transformers
+sentence-transformers
+torch
+psycopg2-binary
+sqlalchemy
+pgvector
+langchain
+pydub
+python-dotenv
