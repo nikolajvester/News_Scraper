@@ -1,28 +1,49 @@
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
+from processing.summarize import summarize_text
+from storage.db import insert_summary
+import time
 
-def scrape_ai_news():
-    url = "https://www.technologyreview.com/topic/artificial-intelligence/"  # Example AI news site
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto(url, timeout=60000)
-
-        # Wait for articles to load (adjust selector for your target site)
-        page.wait_for_selector("article")
-
-        # Get full HTML content
-        html = page.content()
-        browser.close()
-
-    # Use BeautifulSoup to extract article titles
+def scrape_article_text(page, url):
+    page.goto(url, timeout=60000)
+    page.wait_for_selector("p.duet--article--dangerously-set-cms-markup.duet--article--standard-paragraph", timeout=15000)
+    html = page.content()
     soup = BeautifulSoup(html, "lxml")
-    articles = soup.find_all("article")
+    paragraphs = soup.select("p.duet--article--dangerously-set-cms-markup.duet--article--standard-paragraph")
+    full_text = "\n".join(p.get_text(strip=True) for p in paragraphs)
+    return full_text
 
-    for idx, article in enumerate(articles[:5], start=1):  # Limit to 5 for now
-        headline = article.get_text(strip=True)
-        print(f"{idx}. {headline[:120]}...")  # Preview first 120 chars
+def scrape_theverge_ai():
+    with sync_playwright() as p:
+        browser = p.firefox.launch(headless=True)
+        page = browser.new_page()
+        page.goto("https://www.theverge.com/ai-artificial-intelligence", timeout=60000)
+        page.wait_for_selector("div.duet--content-cards--content-card")
+        html = page.content()
 
-if __name__ == "__main__":
-    scrape_ai_news()
+        soup = BeautifulSoup(html, "lxml")
+        articles = soup.select("div.duet--content-cards--content-card")
+
+        print(f"📰 Found {len(articles)} articles\n")
+
+        for article in articles:
+            a_tag = article.select_one("a")
+            if not a_tag:
+                continue
+
+            title = a_tag.get("aria-label", "").strip()
+            relative_link = a_tag.get("href", "").strip()
+            url = "https://www.theverge.com" + relative_link
+
+            try:
+                print(f"🔗 Visiting: {title}")
+                full_article = scrape_article_text(page, url)
+                summary = summarize_text(full_article)
+                insert_summary(title, url, summary)
+                print("✅ Summary saved\n")
+                time.sleep(2)
+            except Exception as e:
+                print(f"❌ Failed on {url}: {e}")
+                continue
+
+        browser.close()
