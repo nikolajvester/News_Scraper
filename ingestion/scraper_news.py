@@ -1,8 +1,14 @@
 from playwright.sync_api import sync_playwright
+from storage.db import url_exists
 from bs4 import BeautifulSoup
 from processing.summarize import summarize_text
 from storage.db import insert_summary
 import time
+
+if url_exists(url):
+    print(f"⚠️ Skipping previously summarized article: {url}")
+    continue
+
 
 def scrape_article_text(page, url):
     page.goto(url, timeout=60000)

@@ -1,16 +1,20 @@
 from transformers import pipeline
 
+MODEL_NAME = "google/flan-t5-base"
+DEVICE = -1
+MAX_LENGTH = 350
+MIN_LENGTH = 50
+
 # Load the summarization model once
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+summarizer = pipeline("summarization", model=MODEL_NAME, tokenizer=MODEL_NAME, device=DEVICE)
 
 def summarize_text(text):
-    if len(text.split()) < 50:
-        return text  # skip very short content
+    word_count = len(text.split())
 
-    summary = summarizer(
-        text,
-        max_length=100,
-        min_length=30,
-        do_sample=False
-    )
-    return summary[0]["summary_text"]
+    if word_count < 50:
+        print(f"🟡 Skipping summary (too short: {word_count} words)")
+        return text
+
+    prompt = f"Summarize the following article critically and concisely. Avoid filler, focus only on key facts and implications:\n{text}"
+    result = summarizer(prompt, max_new_tokens=150, do_sample=False)
+    return result[0]["summary_text"]
